@@ -24,6 +24,15 @@ typedef struct Pname
  * Input/Output functions
  *****************************************************************************/
 
+static void
+pname_abs_error_internal(char * str)
+{
+     ereport(ERROR,
+            (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+                errmsg("invalid input syntax for type %s: \"%s\"",
+                    "pname", str)));
+}
+
 PG_FUNCTION_INFO_V1(pname_in);
 
 Datum
@@ -38,28 +47,21 @@ pname_in(PG_FUNCTION_ARGS)
     int family_size = ptr-str;
     int given_size = strlen(str) - family_size-1;
 
-    bool error = false;
     if(given_size < 2 || family_size < 2)
-        error = true;
+        pname_abs_error_internal(str);
 
     if(*(ptr-1) == ' ')
-        error = true;
+        pname_abs_error_internal(str);
 
     if(strchr(ptr+1, ',')!= NULL)
-        error = true;
+        pname_abs_error_internal(str);
 
     if(*(ptr+1) == ' '){
         ptr+=1;
         given_size -=1;
     }
     if(('a'<=str[0] && str[0]<= 'z') || ('a'<=ptr[1] && ptr[1]<= 'z'))
-        error = true;
-
-    if (error)
-        ereport(ERROR,
-            (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-                errmsg("invalid input syntax for type %s: \"%s\"",
-                    "pname", str)));
+        pname_abs_error_internal(str);
 
     family = (char *) palloc(sizeof(char)*(family_size+1));
     given = (char *) palloc(sizeof(char)*(given_size+1));

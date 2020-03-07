@@ -36,7 +36,7 @@ create table Students (
 );
 
 insert into Students(name) values
-('Shepherd John Andrew'),
+('Shepherd, John Andrew'),
 ('Smith, Stephen');
 
 create index on Students using hash (name);
