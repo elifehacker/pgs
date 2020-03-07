@@ -34,6 +34,7 @@ pname_in(PG_FUNCTION_ARGS)
             *given = NULL;
 	Pname   *result;
 
+    char *ptr = strchr(str, ',');
     int family_size = ptr-str;
     int given_size = strlen(str) - family_size-1;
 
@@ -219,5 +220,5 @@ pname_abs_show(PG_FUNCTION_ARGS)
     memcpy(c, a, strlen(a));
     memcpy(c+strlen(a), b, strlen(b));
     *(c+strlen(a)+strlen(b)) = '\0';
-	PG_RETURN_CSTRING(p->given, p->family);
+	PG_RETURN_CSTRING(c);
 }

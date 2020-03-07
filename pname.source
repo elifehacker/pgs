@@ -46,32 +46,12 @@ CREATE FUNCTION pname_out(pname)
    AS '_OBJWD_/pname'
    LANGUAGE C IMMUTABLE STRICT;
 
--- the binary input function 'pname_recv' takes a StringInfo buffer
--- and turns its contents into the internal representation.
-
-CREATE FUNCTION pname_recv(internal)
-   RETURNS pname
-   AS '_OBJWD_/pname'
-   LANGUAGE C IMMUTABLE STRICT;
-
--- the binary output function 'pname_send' takes the internal representation
--- and converts it into a (hopefully) platform-independent bytea string.
-
-CREATE FUNCTION pname_send(pname)
-   RETURNS bytea
-   AS '_OBJWD_/pname'
-   LANGUAGE C IMMUTABLE STRICT;
-
-
 -- now, we can create the type. The internallength specifies the size of the
 -- memory block required to hold the type (we need two 8-byte doubles).
 
 CREATE TYPE pname (
-   internallength = 16,
    input = pname_in,
    output = pname_out,
-   receive = pname_recv,
-   send = pname_send,
    alignment = double
 );
 
@@ -83,68 +63,30 @@ CREATE TYPE pname (
 
 -- eg. we can use it in a table
 
-CREATE TABLE test_pname (
-	a	pname,
-	b	pname
+DROP TABLE if exists Students;
+
+create table Students (
+   zid       integer primary key,
+   name      PersonName not null,
+   degree    text,
+   -- etc. etc.
 );
 
--- data for user-defined types are just strings in the proper textual
--- representation.
+insert into Students(zid,name,degree) values
+(9300035,'Shepherd, John Andrew', 'BSc(Computer Science)'),
+(5012345,'Smith, Stephen', 'BE(Hons)(Software Engineering)');
 
-INSERT INTO test_pname VALUES ('(1.0, 2.5)', '(4.2, 3.55 )');
-INSERT INTO test_pname VALUES ('(33.0, 51.4)', '(100.42, 93.55)');
+create index on Students using hash (name);
 
-SELECT * FROM test_pname;
+select a.zid, a.name, b.zid
+from   Students a join Students b on (a.name = b.name);
 
------------------------------
--- Creating an operator for the new type:
---	Let's define an add operator for pname types. Since POSTGRES
---	supports function overloading, we'll use + as the add operator.
---	(Operator names can be reused with different numbers and types of
---	arguments.)
------------------------------
+select family(name), given(name), show(name)
+from   Students;
 
--- first, define a function pname_add (also in pname.c)
-CREATE FUNCTION pname_add(pname, pname)
-   RETURNS pname
-   AS '_OBJWD_/pname'
-   LANGUAGE C IMMUTABLE STRICT;
-
--- we can now define the operator. We show a binary operator here but you
--- can also define unary operators by omitting either of leftarg or rightarg.
-CREATE OPERATOR + (
-   leftarg = pname,
-   rightarg = pname,
-   procedure = pname_add,
-   commutator = +
-);
-
-
-SELECT (a + b) AS c FROM test_pname;
-
--- Occasionally, you may find it useful to cast the string to the desired
--- type explicitly. :: denotes a type cast.
-
-SELECT  a + '(1.0,1.0)'::pname AS aa,
-        b + '(1.0,1.0)'::pname AS bb
-   FROM test_pname;
-
-
------------------------------
--- Creating aggregate functions
---	you can also define aggregate functions. The syntax is somewhat
---	cryptic but the idea is to express the aggregate in terms of state
---	transition functions.
------------------------------
-
-CREATE AGGREGATE pname_sum (
-   sfunc = pname_add,
-   basetype = pname,
-   stype = pname,
-   initcond = '(0,0)'
-);
-
-SELECT pname_sum(a) FROM test_pname;
+select name,count(*)
+from   Students
+group  by name;
 
 
 -----------------------------
