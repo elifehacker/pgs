@@ -76,6 +76,15 @@ pname_abs_cmp_internal(Pname * a, Pname * b)
     return strcmp(a->given, b->given);
 }
 
+void show(char* a, char* b){
+    char* c = (char *) malloc(sizeof(char)*(strlen(a)+strlen(b)+1));
+    memcpy(c, a, strlen(a));
+    memcpy(c+strlen(a), b, strlen(b));
+    *(c+strlen(a)+strlen(b)) = '\0';
+    printf("string %s\n", c);
+    free(c);
+}
+
 int main(){
     char* test_data [] = {
         "Smith,John",
@@ -129,6 +138,8 @@ int main(){
     assert(pname_abs_cmp_internal(pname3, pname2)>0);
     assert(pname_abs_cmp_internal(pname1, pname1)<=0);
     assert(pname_abs_cmp_internal(pname4, pname3)>0);
+
+    show("aa","bb");
 
     printf("done");
     return 0;

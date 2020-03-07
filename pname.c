@@ -60,8 +60,8 @@ pname_in(PG_FUNCTION_ARGS)
                 errmsg("invalid input syntax for type %s: \"%s\"",
                     "pname", str)));
 
-    family = (char *) malloc(sizeof(char)*(family_size+1));
-    given = (char *) malloc(sizeof(char)*(given_size+1));
+    family = (char *) palloc(sizeof(char)*(family_size+1));
+    given = (char *) palloc(sizeof(char)*(given_size+1));
 
     memcpy(family, str, family_size);
     memcpy(given, ptr+1, given_size);
@@ -185,4 +185,39 @@ pname_abs_cmp(PG_FUNCTION_ARGS)
 	Pname    *b = (Pname *) PG_GETARG_POINTER(1);
 
 	PG_RETURN_INT32(pname_abs_cmp_internal(a, b));
+}
+
+PG_FUNCTION_INFO_V1(pname_abs_family);
+
+Datum
+pname_abs_family(PG_FUNCTION_ARGS)
+{
+	Pname    *p = (Pname *) PG_GETARG_POINTER(0);
+
+	PG_RETURN_CSTRING(p->family);
+}
+
+PG_FUNCTION_INFO_V1(pname_abs_given);
+
+Datum
+pname_abs_given(PG_FUNCTION_ARGS)
+{
+	Pname    *p = (Pname *) PG_GETARG_POINTER(0);
+
+	PG_RETURN_CSTRING(p->given);
+}
+
+PG_FUNCTION_INFO_V1(pname_abs_show);
+
+Datum
+pname_abs_show(PG_FUNCTION_ARGS)
+{
+	Pname *p = (Pname *) PG_GETARG_POINTER(0);
+	char * a= p->given;
+    char * b= p->family;
+    char* c = (char *) palloc(sizeof(char)*(strlen(a)+strlen(b)+1));
+    memcpy(c, a, strlen(a));
+    memcpy(c+strlen(a), b, strlen(b));
+    *(c+strlen(a)+strlen(b)) = '\0';
+	PG_RETURN_CSTRING(p->given, p->family);
 }
