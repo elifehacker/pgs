@@ -1,0 +1,174 @@
+---------------------------------------------------------------------------
+--
+-- pname.sql-
+--    This file shows how to create a new user-defined type and how to
+--    use this new type.
+--
+--
+-- Portions Copyright (c) 1996-2019, PostgreSQL Global Development Group
+-- Portions Copyright (c) 1994, Regents of the University of California
+--
+-- src/tutorial/pname.source
+--
+---------------------------------------------------------------------------
+
+-----------------------------
+-- Creating a new type:
+--	We are going to create a new type called 'pname' which represents
+--	pname numbers.
+--	A user-defined type must have an input and an output function, and
+--	optionally can have binary input and output functions.  All of these
+--	are usually user-defined C functions.
+-----------------------------
+
+-- Assume the user defined functions are in _OBJWD_/pname$DLSUFFIX
+-- (we do not want to assume this is in the dynamic loader search path).
+-- Look at $PWD/pname.c for the source.  Note that we declare all of
+-- them as STRICT, so we do not need to cope with NULL inputs in the
+-- C code.  We also mark them IMMUTABLE, since they always return the
+-- same outputs given the same inputs.
+
+-- the input function 'pname_in' takes a null-terminated string (the
+-- textual representation of the type) and turns it into the internal
+-- (in memory) representation. You will get a message telling you 'pname'
+-- does not exist yet but that's okay.
+
+CREATE FUNCTION pname_in(cstring)
+   RETURNS pname
+   AS '_OBJWD_/pname'
+   LANGUAGE C IMMUTABLE STRICT;
+
+-- the output function 'pname_out' takes the internal representation and
+-- converts it into the textual representation.
+
+CREATE FUNCTION pname_out(pname)
+   RETURNS cstring
+   AS '_OBJWD_/pname'
+   LANGUAGE C IMMUTABLE STRICT;
+
+-- now, we can create the type. The internallength specifies the size of the
+-- memory block required to hold the type (we need two 8-byte doubles).
+
+CREATE TYPE pname (
+   input = pname_in,
+   output = pname_out,
+   alignment = double
+);
+
+
+-----------------------------
+-- Using the new type:
+--	user-defined types can be used like ordinary built-in types.
+-----------------------------
+
+-- eg. we can use it in a table
+
+DROP TABLE if exists Students;
+
+create table Students (
+   zid       integer primary key,
+   name      PersonName not null,
+   degree    text,
+   -- etc. etc.
+);
+
+insert into Students(zid,name,degree) values
+(9300035,'Shepherd, John Andrew', 'BSc(Computer Science)'),
+(5012345,'Smith, Stephen', 'BE(Hons)(Software Engineering)');
+
+create index on Students using hash (name);
+
+select a.zid, a.name, b.zid
+from   Students a join Students b on (a.name = b.name);
+
+select family(name), given(name), show(name)
+from   Students;
+
+select name,count(*)
+from   Students
+group  by name;
+
+
+-----------------------------
+-- Interfacing New Types with Indexes:
+--	We cannot define a secondary index (eg. a B-tree) over the new type
+--	yet. We need to create all the required operators and support
+--      functions, then we can make the operator class.
+-----------------------------
+
+-- first, define the required operators
+CREATE FUNCTION pname_abs_lt(pname, pname) RETURNS bool
+   AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION pname_abs_le(pname, pname) RETURNS bool
+   AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION pname_abs_eq(pname, pname) RETURNS bool
+   AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION pname_abs_ge(pname, pname) RETURNS bool
+   AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION pname_abs_gt(pname, pname) RETURNS bool
+   AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+
+CREATE OPERATOR < (
+   leftarg = pname, rightarg = pname, procedure = pname_abs_lt,
+   commutator = > , negator = >= ,
+   restrict = scalarltsel, join = scalarltjoinsel
+);
+CREATE OPERATOR <= (
+   leftarg = pname, rightarg = pname, procedure = pname_abs_le,
+   commutator = >= , negator = > ,
+   restrict = scalarlesel, join = scalarlejoinsel
+);
+CREATE OPERATOR = (
+   leftarg = pname, rightarg = pname, procedure = pname_abs_eq,
+   commutator = = , negator = <> ,
+   restrict = eqsel, join = eqjoinsel
+);
+CREATE OPERATOR >= (
+   leftarg = pname, rightarg = pname, procedure = pname_abs_ge,
+   commutator = <= , negator = < ,
+   restrict = scalargesel, join = scalargejoinsel
+);
+CREATE OPERATOR > (
+   leftarg = pname, rightarg = pname, procedure = pname_abs_gt,
+   commutator = < , negator = <= ,
+   restrict = scalargtsel, join = scalargtjoinsel
+);
+CREATE OPERATOR <> (
+   leftarg = pname, rightarg = pname, procedure = pname_abs_ne,
+   commutator = <> , negator = = ,
+   restrict = neqsel, join = neqjoinsel
+);
+
+-- create the support function too
+CREATE FUNCTION pname_abs_cmp(pname, pname) RETURNS int4
+   AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+
+-- now we can make the operator class
+CREATE OPERATOR CLASS pname_abs_ops
+    DEFAULT FOR TYPE pname USING btree AS
+        OPERATOR        1       < ,
+        OPERATOR        2       <= ,
+        OPERATOR        3       = ,
+        OPERATOR        4       >= ,
+        OPERATOR        5       > ,
+        OPERATOR        6       <> ,
+        FUNCTION        1       pname_abs_cmp(pname, pname);
+
+
+-- now, we can define a btree index on pname types. First, let's populate
+-- the table. Note that postgres needs many more tuples to start using the
+-- btree index during selects.
+INSERT INTO test_pname VALUES ('(56.0,-22.5)', '(-43.2,-0.07)');
+INSERT INTO test_pname VALUES ('(-91.9,33.6)', '(8.6,3.0)');
+
+CREATE INDEX test_cplx_ind ON test_pname
+   USING btree(a pname_abs_ops);
+
+SELECT * from test_pname where a = '(56.0,-22.5)';
+SELECT * from test_pname where a < '(56.0,-22.5)';
+SELECT * from test_pname where a > '(56.0,-22.5)';
+
+
+-- clean up the example
+DROP TABLE test_pname;
+DROP TYPE pname CASCADE;
