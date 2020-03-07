@@ -178,9 +178,7 @@ CREATE OPERATOR <= (
 );
 CREATE OPERATOR = (
    leftarg = pname, rightarg = pname, procedure = pname_abs_eq,
-   commutator = = ,
-   -- leave out negator since we didn't create <> operator
-   -- negator = <> ,
+   commutator = = , negator = <> ,
    restrict = eqsel, join = eqjoinsel
 );
 CREATE OPERATOR >= (
@@ -192,6 +190,11 @@ CREATE OPERATOR > (
    leftarg = pname, rightarg = pname, procedure = pname_abs_gt,
    commutator = < , negator = <= ,
    restrict = scalargtsel, join = scalargtjoinsel
+);
+CREATE OPERATOR <> (
+   leftarg = pname, rightarg = pname, procedure = pname_abs_ne,
+   commutator = <> , negator = = ,
+   restrict = neqsel, join = neqjoinsel
 );
 
 -- create the support function too
@@ -206,6 +209,7 @@ CREATE OPERATOR CLASS pname_abs_ops
         OPERATOR        3       = ,
         OPERATOR        4       >= ,
         OPERATOR        5       > ,
+        OPERATOR        6       <> ,
         FUNCTION        1       pname_abs_cmp(pname, pname);
 
 

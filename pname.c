@@ -16,10 +16,9 @@ PG_MODULE_MAGIC;
 
 typedef struct Pname
 {
-	char *		x;
-	char *		y;
+	char *		family;
+	char *		given;
 } Pname;
-
 
 /*****************************************************************************
  * Input/Output functions
@@ -31,12 +30,12 @@ Datum
 pname_in(PG_FUNCTION_ARGS)
 {
 	char	*str = PG_GETARG_CSTRING(0);
-	char	*x = NULL,
-            *y = NULL;
+	char	*family = NULL,
+            *given = NULL;
 	Pname   *result;
 
-    int given_size = ptr-str;
-    int family_size = strlen(str) - given_size-1;
+    int family_size = ptr-str;
+    int given_size = strlen(str) - family_size-1;
 
     bool error = false;
     if(given_size < 2 || family_size < 2)
@@ -50,7 +49,7 @@ pname_in(PG_FUNCTION_ARGS)
 
     if(*(ptr+1) == ' '){
         ptr+=1;
-        family_size -=1;
+        given_size -=1;
     }
     if(('a'<=str[0] && str[0]<= 'z') || ('a'<=ptr[1] && ptr[1]<= 'z'))
         error = true;
@@ -61,17 +60,17 @@ pname_in(PG_FUNCTION_ARGS)
                 errmsg("invalid input syntax for type %s: \"%s\"",
                     "pname", str)));
 
-    x = (char *) palloc(sizeof(char)*(given_size+1));
-    y = (char *) palloc(sizeof(char)*(family_size+1));
+    family = (char *) malloc(sizeof(char)*(family_size+1));
+    given = (char *) malloc(sizeof(char)*(given_size+1));
 
-    memcpy(x, str, given_size);
-    memcpy(y, ptr+1, family_size);
-    *(x+given_size) = '\0';
-    *(y+family_size) = '\0';
+    memcpy(family, str, family_size);
+    memcpy(given, ptr+1, given_size);
+    *(family+family_size) = '\0';
+    *(given+given_size) = '\0';
 
 	result = (Pname *) palloc(sizeof(Pname));
-	result->x = x;
-	result->y = y;
+	result->family = family;
+	result->given = given;
 	PG_RETURN_POINTER(result);
 }
 
@@ -81,67 +80,11 @@ Datum
 pname_out(PG_FUNCTION_ARGS)
 {
 	Pname    *pname = (Pname *) PG_GETARG_POINTER(0);
-	char	   *result;
+	char	 *result;
 
-	result = psprintf("(%g,%g)", pname->x, pname->y);
+	result = psprintf("%s, %s", pname->family, pname->given);
 	PG_RETURN_CSTRING(result);
 }
-
-/*****************************************************************************
- * Binary Input/Output functions
- *
- * These are optional.
- *****************************************************************************/
-
-PG_FUNCTION_INFO_V1(pname_recv);
-
-Datum
-pname_recv(PG_FUNCTION_ARGS)
-{
-	StringInfo	buf = (StringInfo) PG_GETARG_POINTER(0);
-	Pname    *result;
-
-	result = (Pname *) palloc(sizeof(Pname));
-	result->x = pq_getmsgfloat8(buf);
-	result->y = pq_getmsgfloat8(buf);
-	PG_RETURN_POINTER(result);
-}
-
-PG_FUNCTION_INFO_V1(pname_send);
-
-Datum
-pname_send(PG_FUNCTION_ARGS)
-{
-	Pname    *pname = (Pname *) PG_GETARG_POINTER(0);
-	StringInfoData buf;
-
-	pq_begintypsend(&buf);
-	pq_sendfloat8(&buf, pname->x);
-	pq_sendfloat8(&buf, pname->y);
-	PG_RETURN_BYTEA_P(pq_endtypsend(&buf));
-}
-
-/*****************************************************************************
- * New Operators
- *
- * A practical Pname datatype would provide much more than this, of course.
- *****************************************************************************/
-
-PG_FUNCTION_INFO_V1(pname_add);
-
-Datum
-pname_add(PG_FUNCTION_ARGS)
-{
-	Pname    *a = (Pname *) PG_GETARG_POINTER(0);
-	Pname    *b = (Pname *) PG_GETARG_POINTER(1);
-	Pname    *result;
-
-	result = (Pname *) palloc(sizeof(Pname));
-	result->x = a->x + b->x;
-	result->y = a->y + b->y;
-	PG_RETURN_POINTER(result);
-}
-
 
 /*****************************************************************************
  * Operator class for defining B-tree index
@@ -159,14 +102,11 @@ pname_add(PG_FUNCTION_ARGS)
 static int
 pname_abs_cmp_internal(Pname * a, Pname * b)
 {
-	double		amag = Mag(a),
-				bmag = Mag(b);
+	int result = strcmp(a->family, b->family);
+    if (result != 0)
+        return result;
 
-	if (amag < bmag)
-		return -1;
-	if (amag > bmag)
-		return 1;
-	return 0;
+    return strcmp(a->given, b->given);
 }
 
 
@@ -201,6 +141,17 @@ pname_abs_eq(PG_FUNCTION_ARGS)
 	Pname    *b = (Pname *) PG_GETARG_POINTER(1);
 
 	PG_RETURN_BOOL(pname_abs_cmp_internal(a, b) == 0);
+}
+
+PG_FUNCTION_INFO_V1(pname_abs_ne);
+
+Datum
+pname_abs_ne(PG_FUNCTION_ARGS)
+{
+	Pname    *a = (Pname *) PG_GETARG_POINTER(0);
+	Pname    *b = (Pname *) PG_GETARG_POINTER(1);
+
+	PG_RETURN_BOOL(pname_abs_cmp_internal(a, b) != 0);
 }
 
 PG_FUNCTION_INFO_V1(pname_abs_ge);
