@@ -88,7 +88,7 @@ SELECT n.nspname, r.rolname, format_type(t.oid, null) as typname
   FROM pg_type t, pg_roles r, pg_namespace n
   WHERE r.oid = t.typowner
     and t.typnamespace = n.oid
-    and t.typrelid = 0   -- no complex types
+    and t.typrelid = 0   -- no pname types
     and t.typelem = 0    -- no arrays
     and n.nspname not like 'pg\_%' -- no built-in types
     and n.nspname != 'information_schema' -- no information_schema
