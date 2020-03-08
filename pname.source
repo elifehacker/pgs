@@ -1,4 +1,4 @@
-Drop TYPE if exists pname cascade;
+Drop TYPE if exists PersonName cascade;
 
 CREATE FUNCTION pname_in(cstring)
    RETURNS pname
@@ -15,13 +15,72 @@ CREATE FUNCTION pname_out(pname)
 
 -- now, we can create the type. The internallength specifies the size of the
 -- memory block required to hold the type (we need two 8-byte doubles).
-CREATE TYPE pname (
+CREATE TYPE PersonName (
    internallength = 16,
    input = pname_in,
    output = pname_out,
    alignment = double
 );
 
+
+-----------------------------
+-- Interfacing New Types with Indexes:
+--	We cannot define a secondary index (eg. a B-tree) over the new type
+--	yet. We need to create all the required operators and support
+--      functions, then we can make the operator class.
+-----------------------------
+
+-- first, define the required operators
+CREATE FUNCTION pname_abs_lt(pname, pname) RETURNS bool
+   AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION pname_abs_le(pname, pname) RETURNS bool
+   AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION pname_abs_eq(pname, pname) RETURNS bool
+   AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION pname_abs_ge(pname, pname) RETURNS bool
+   AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION pname_abs_gt(pname, pname) RETURNS bool
+   AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+
+CREATE OPERATOR < (
+   leftarg = pname, rightarg = pname, procedure = pname_abs_lt,
+   commutator = > , negator = >= ,
+   restrict = scalarltsel, join = scalarltjoinsel
+);
+CREATE OPERATOR <= (
+   leftarg = pname, rightarg = pname, procedure = pname_abs_le,
+   commutator = >= , negator = > ,
+   restrict = scalarlesel, join = scalarlejoinsel
+);
+CREATE OPERATOR = (
+   leftarg = pname, rightarg = pname, procedure = pname_abs_eq,
+   commutator = = , negator = <> ,
+   restrict = eqsel, join = eqjoinsel
+);
+CREATE OPERATOR >= (
+   leftarg = pname, rightarg = pname, procedure = pname_abs_ge,
+   commutator = <= , negator = < ,
+   restrict = scalargesel, join = scalargejoinsel
+);
+CREATE OPERATOR > (
+   leftarg = pname, rightarg = pname, procedure = pname_abs_gt,
+   commutator = < , negator = <= ,
+   restrict = scalargtsel, join = scalargtjoinsel
+);
+
+-- create the support function too
+CREATE FUNCTION pname_abs_cmp(pname, pname) RETURNS int4
+   AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+
+-- now we can make the operator class
+CREATE OPERATOR CLASS pname_abs_ops
+    DEFAULT FOR TYPE PersonName USING btree AS
+        OPERATOR        1       < ,
+        OPERATOR        2       <= ,
+        OPERATOR        3       = ,
+        OPERATOR        4       >= ,
+        OPERATOR        5       > ,
+        FUNCTION        1       pname_abs_cmp(pname, pname);
 
 -----------------------------
 -- Using the new type:
@@ -32,12 +91,15 @@ CREATE TYPE pname (
 
 DROP TABLE if exists Students;
 create table Students (
-   name      pname not null
+   zid       integer primary key,
+   name      PersonName not null,
+   degree    text,
+   -- etc. etc.
 );
 
-insert into Students(name) values
-('Shepherd, John Andrew'),
-('Smith, Stephen');
+insert into Students(zid,name,degree) values
+(9300035,'Shepherd, John Andrew', 'BSc(Computer Science)'),
+(5012345,'Smith, Stephen', 'BE(Hons)(Software Engineering)');
 
 create index on Students using hash (name);
 select a.zid, a.name, b.zid
