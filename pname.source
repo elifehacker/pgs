@@ -1,14 +1,14 @@
 Drop TYPE if exists PersonName cascade;
 
 CREATE FUNCTION pname_in(cstring)
-   RETURNS pname
+   RETURNS PersonName
    AS '_OBJWD_/pname'
    LANGUAGE C IMMUTABLE STRICT;
 
 -- the output function 'pname_out' takes the internal representation and
 -- converts it into the textual representation.
 
-CREATE FUNCTION pname_out(pname)
+CREATE FUNCTION pname_out(PersonName)
    RETURNS cstring
    AS '_OBJWD_/pname'
    LANGUAGE C IMMUTABLE STRICT;
@@ -31,45 +31,45 @@ CREATE TYPE PersonName (
 -----------------------------
 
 -- first, define the required operators
-CREATE FUNCTION pname_abs_lt(pname, pname) RETURNS bool
+CREATE FUNCTION pname_abs_lt(PersonName, PersonName) RETURNS bool
    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
-CREATE FUNCTION pname_abs_le(pname, pname) RETURNS bool
+CREATE FUNCTION pname_abs_le(PersonName, PersonName) RETURNS bool
    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
-CREATE FUNCTION pname_abs_eq(pname, pname) RETURNS bool
+CREATE FUNCTION pname_abs_eq(PersonName, PersonName) RETURNS bool
    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
-CREATE FUNCTION pname_abs_ge(pname, pname) RETURNS bool
+CREATE FUNCTION pname_abs_ge(PersonName, PersonName) RETURNS bool
    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
-CREATE FUNCTION pname_abs_gt(pname, pname) RETURNS bool
+CREATE FUNCTION pname_abs_gt(PersonName, PersonName) RETURNS bool
    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
 
 CREATE OPERATOR < (
-   leftarg = pname, rightarg = pname, procedure = pname_abs_lt,
+   leftarg = PersonName, rightarg = PersonName, procedure = pname_abs_lt,
    commutator = > , negator = >= ,
    restrict = scalarltsel, join = scalarltjoinsel
 );
 CREATE OPERATOR <= (
-   leftarg = pname, rightarg = pname, procedure = pname_abs_le,
+   leftarg = PersonName, rightarg = PersonName, procedure = pname_abs_le,
    commutator = >= , negator = > ,
    restrict = scalarlesel, join = scalarlejoinsel
 );
 CREATE OPERATOR = (
-   leftarg = pname, rightarg = pname, procedure = pname_abs_eq,
+   leftarg = PersonName, rightarg = PersonName, procedure = pname_abs_eq,
    commutator = = , negator = <> ,
    restrict = eqsel, join = eqjoinsel
 );
 CREATE OPERATOR >= (
-   leftarg = pname, rightarg = pname, procedure = pname_abs_ge,
+   leftarg = PersonName, rightarg = PersonName, procedure = pname_abs_ge,
    commutator = <= , negator = < ,
    restrict = scalargesel, join = scalargejoinsel
 );
 CREATE OPERATOR > (
-   leftarg = pname, rightarg = pname, procedure = pname_abs_gt,
+   leftarg = PersonName, rightarg = PersonName, procedure = pname_abs_gt,
    commutator = < , negator = <= ,
    restrict = scalargtsel, join = scalargtjoinsel
 );
 
 -- create the support function too
-CREATE FUNCTION pname_abs_cmp(pname, pname) RETURNS int4
+CREATE FUNCTION pname_abs_cmp(PersonName, PersonName) RETURNS int4
    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
 
 -- now we can make the operator class
@@ -80,7 +80,7 @@ CREATE OPERATOR CLASS pname_abs_ops
         OPERATOR        3       = ,
         OPERATOR        4       >= ,
         OPERATOR        5       > ,
-        FUNCTION        1       pname_abs_cmp(pname, pname);
+        FUNCTION        1       pname_abs_cmp(PersonName, PersonName);
 
 -----------------------------
 -- Using the new type:
@@ -93,17 +93,14 @@ DROP TABLE if exists Students;
 create table Students (
    zid       integer primary key,
    name      PersonName not null,
-   degree    text,
-   -- etc. etc.
+   degree    text
 );
 
 insert into Students(zid,name,degree) values
 (9300035,'Shepherd, John Andrew', 'BSc(Computer Science)'),
 (5012345,'Smith, Stephen', 'BE(Hons)(Software Engineering)');
 
-create index on Students using hash (name);
-select a.zid, a.name, b.zid
-from   Students a join Students b on (a.name = b.name);
+
 
 select family(name), given(name), show(name)
 from   Students;
