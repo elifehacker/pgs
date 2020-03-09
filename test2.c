@@ -64,15 +64,16 @@ void printStudent(struct student *s)
 // Driver Code
 int main()
 {
-    struct student *s1 = createStudent(s1, 523, "Cherry");
-    struct student *s2 = createStudent(s2, 535, "Sanjayulsha");
+    Student *s1 = createStudent(s1, 523, "Cherry");
+    Student *s2 = createStudent(s2, 535, "Sanjayulsha");
 
     Pair *p = (Pair *) malloc(sizeof(Pair));
     p->one = *s1;
     p->two = *s2;
 
-    printStudent(&(p->one));
-    printStudent(&(p->two));
+    s1->stud_name[1]='\0';
+    printStudent(s1);
+    printStudent(s2);
 
     // Size in struct student
     printf("Size of Struct student: %lu\n",

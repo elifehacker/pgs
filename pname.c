@@ -18,6 +18,8 @@ PG_MODULE_MAGIC;
 typedef struct PersonName
 {
     int struct_size;
+    int family_end;
+    int given_start;
 	char name[];
 } PersonName;
 
@@ -34,7 +36,7 @@ pname_abs_error_internal(char * str)
                     "pname", str)));
 }
 
-static struct PersonName *createPName(struct PersonName *s, char a[])
+static struct PersonName *createPName(struct PersonName *s, char a[], int family_end, int given_start)
 {
     // Allocating memory according to user provided
     // array of characters
@@ -50,10 +52,12 @@ static struct PersonName *createPName(struct PersonName *s, char a[])
     // which is a copy of user provided array a[].
     s->struct_size =
         (sizeof(*s) + sizeof(char) * strlen(s->name));
+    s->family_end = family_end;
+    s->given_start = given_start;
 
 ereport(WARNING,
     (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-        errmsg("+ input syntax for type %s", s->name)));
+        errmsg("+ input syntax for type %s %d %d ", s->name, family_end, given_start )));
 
     return s;
 }
@@ -93,7 +97,7 @@ pname_in(PG_FUNCTION_ARGS)
         errmsg("1 input syntax for type %d: \"%d\"",
             family_size, given_size)));
 
-	result = createPName(result, str);
+	result = createPName(result, str, family_size, ptr - str + 1);
 
 	    ereport(WARNING,
             (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
@@ -128,14 +132,40 @@ pname_out(PG_FUNCTION_ARGS)
 
 #define Mag(c)	((c)->x*(c)->x + (c)->y*(c)->y)
 
+static char *
+get_family(PersonName * p)
+{
+    char *family = palloc(sizeof(char)*(p->family_end+1));
+    memcpy(family, p->name, p->family_end);
+    family[p->family_end] = '\0';
+	return family;
+}
+
+static char *
+get_given(PersonName * p)
+{
+	return p->name + p->given_start;
+}
+
 static int
 pname_abs_cmp_internal(PersonName * a, PersonName * b)
 {
+    //char * af = get_family(a);
+    //char * bf = get_family(b);
+    char at = a->name[a->family_end];
+    char bt = b->name[b->family_end];
+    a->name[a->family_end] = '\0';
+    b->name[b->family_end] = '\0';
+
 	int result = strcmp(a->name, b->name);
+
+	a->name[a->family_end] = at;
+	b->name[b->family_end] = bt;
+
     if (result != 0)
         return result;
 
-    return strcmp(a->name, b->name);
+    return strcmp(get_given(a), get_given(b));
 }
 
 
