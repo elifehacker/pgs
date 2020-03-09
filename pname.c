@@ -15,20 +15,11 @@
 
 PG_MODULE_MAGIC;
 
-
-typedef struct PName
+typedef struct PersonName
 {
     int struct_size;
 	char name[];
-} PName;
-
-typedef struct PersonName
-{
-	PName *		family;
-	PName *		given;
 } PersonName;
-
-
 
 /*****************************************************************************
  * Input/Output functions
@@ -43,7 +34,7 @@ pname_abs_error_internal(char * str)
                     "pname", str)));
 }
 
-static struct PName *createPName(struct PName *s, char a[])
+static struct PersonName *createPName(struct PersonName *s, char a[])
 {
     // Allocating memory according to user provided
     // array of characters
@@ -52,17 +43,17 @@ static struct PName *createPName(struct PName *s, char a[])
     (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
         errmsg("- input syntax for type")));
 
-    s = malloc( sizeof(*s) + sizeof(char) * strlen(a));
-
-    ereport(WARNING,
-    (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-        errmsg("+ input syntax for type")));
+    s = palloc( sizeof(*s) + sizeof(char) * strlen(a));
 
     strcpy(s->name, a);
     // Assigning size according to size of stud_name
     // which is a copy of user provided array a[].
     s->struct_size =
         (sizeof(*s) + sizeof(char) * strlen(s->name));
+
+ereport(WARNING,
+    (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+        errmsg("+ input syntax for type %s", s->name)));
 
     return s;
 }
@@ -74,8 +65,6 @@ Datum
 pname_in(PG_FUNCTION_ARGS)
 {
 	char	*str = PG_GETARG_CSTRING(0);
-	PName	*family = NULL,
-            *given = NULL;
 	PersonName   *result;
 
     char *ptr = strchr(str, ',');
@@ -104,17 +93,12 @@ pname_in(PG_FUNCTION_ARGS)
         errmsg("1 input syntax for type %d: \"%d\"",
             family_size, given_size)));
 
-    family = createPName(family, str);
-    given = createPName(given, str);
+	result = createPName(result, str);
 
-    ereport(WARNING,
+	    ereport(WARNING,
             (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
                 errmsg("2 input syntax for type %s: \"%s\"",
                     "pname", str)));
-
-	result = (PersonName *) palloc(sizeof(PersonName));
-	result->family= family;
-    result->given = given;
 
 	PG_RETURN_POINTER(result);
 }
@@ -127,19 +111,7 @@ pname_out(PG_FUNCTION_ARGS)
 	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
 	char	 *result;
 
-	result = psprintf("%s,%s", pname->family->name, pname->given->name);
-	PG_RETURN_CSTRING(result);
-}
-
-PG_FUNCTION_INFO_V1(pname_family);
-
-Datum
-pname_family(PG_FUNCTION_ARGS)
-{
-	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
-	char	 *result;
-
-	result = psprintf("%s", pname->family->name);
+	result = psprintf("%s", pname->name);
 	PG_RETURN_CSTRING(result);
 }
 
@@ -159,11 +131,11 @@ pname_family(PG_FUNCTION_ARGS)
 static int
 pname_abs_cmp_internal(PersonName * a, PersonName * b)
 {
-	int result = strcmp(a->family->name, b->family->name);
+	int result = strcmp(a->name, b->name);
     if (result != 0)
         return result;
 
-    return strcmp(a->given->name, b->given->name);
+    return strcmp(a->name, b->name);
 }
 
 

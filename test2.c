@@ -23,8 +23,8 @@ typedef struct student
 
 typedef struct pair
 {
-    Student *one;
-    Student *two;
+    Student one;
+    Student two;
 }Pair;
 
 // Memory allocation and initialisation of structure
@@ -68,11 +68,11 @@ int main()
     struct student *s2 = createStudent(s2, 535, "Sanjayulsha");
 
     Pair *p = (Pair *) malloc(sizeof(Pair));
-    p->one = s1;
-    p->two = s2;
+    p->one = *s1;
+    p->two = *s2;
 
-    printStudent(p->one);
-    printStudent(p->two);
+    printStudent(&(p->one));
+    printStudent(&(p->two));
 
     // Size in struct student
     printf("Size of Struct student: %lu\n",

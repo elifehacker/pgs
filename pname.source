@@ -14,10 +14,11 @@ CREATE FUNCTION pname_out(PersonName)
    LANGUAGE C IMMUTABLE STRICT;
 
 CREATE TYPE PersonName (
-   internallength = 16,
+   internallength = 250,
    input = pname_in,
    output = pname_out,
-   alignment = double
+   alignment = double,
+   storage = plain
 );
 
 CREATE FUNCTION pname_family(PersonName)
