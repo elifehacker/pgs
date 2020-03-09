@@ -179,15 +179,20 @@ pname_abs_cmp_internal(PersonName * a, PersonName * b)
 static int
 pname_hash_internal(PersonName * p)
 {
-    return -1;
-	//return hash_any((const unsigned char *)p->name, 8);
+    int h = hash_any((const unsigned char *)p->name, strlen(p->name));
+    ereport(WARNING,
+            (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+                errmsg("99 input syntax for type %d %s",
+                    h, p->name)));
+
+	return h;
 }
 
 
-PG_FUNCTION_INFO_V1(hash);
+PG_FUNCTION_INFO_V1(hash1);
 
 Datum
-hash(PG_FUNCTION_ARGS)
+hash1(PG_FUNCTION_ARGS)
 {
 	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
 	PG_RETURN_INT32(pname_hash_internal(pname));

@@ -101,7 +101,7 @@ CREATE FUNCTION pname_abs_cmp(PersonName, PersonName) RETURNS int4
 --      user-defined types can be used like ordinary built-in types.
 -----------------------------
 
-CREATE FUNCTION hash(PersonName)
+CREATE FUNCTION hash1(PersonName)
     RETURNS int4
     AS '_OBJWD_/pname'
     LANGUAGE C IMMUTABLE STRICT;
@@ -126,7 +126,7 @@ from   Students;
 CREATE OPERATOR CLASS pname_abs_ops
     DEFAULT FOR TYPE PersonName USING hash AS
         OPERATOR        1       = ,
-        FUNCTION        1       hash(PersonName);
+        FUNCTION        1       hash1(PersonName);
 
-create index on Students using hash(name pname_abs_ops);
+create index on Students using hash(name);
 
