@@ -9,6 +9,7 @@
 
 #include "postgres.h"
 #include "string.h"
+#include "utils/hashutils.h"
 
 #include "fmgr.h"
 #include "libpq/pqformat.h"		/* needed for send/recv functions */
@@ -173,6 +174,23 @@ pname_abs_cmp_internal(PersonName * a, PersonName * b)
         return result;
 
     return strcmp(get_given(a), get_given(b));
+}
+
+static int
+pname_hash_internal(PersonName * p)
+{
+    return -1;
+	//return hash_any((const unsigned char *)p->name, 8);
+}
+
+
+PG_FUNCTION_INFO_V1(hash);
+
+Datum
+hash(PG_FUNCTION_ARGS)
+{
+	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
+	PG_RETURN_INT32(pname_hash_internal(pname));
 }
 
 PG_FUNCTION_INFO_V1(family);

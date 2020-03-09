@@ -4,7 +4,6 @@
 #include<string.h>
 #include<stdio.h>
 #include<stdlib.h>
-
 // A structure of type student
 typedef struct student
 {

@@ -14,10 +14,9 @@ CREATE FUNCTION pname_out(PersonName)
    LANGUAGE C IMMUTABLE STRICT;
 
 CREATE TYPE PersonName (
-   internallength = 250,
    input = pname_in,
    output = pname_out,
-   alignment = double,
+   internallength = 500,
    storage = plain
 );
 
@@ -27,6 +26,11 @@ CREATE FUNCTION family(PersonName)
    LANGUAGE C IMMUTABLE STRICT;
 
 CREATE FUNCTION given(PersonName)
+   RETURNS cstring
+   AS '_OBJWD_/pname'
+   LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION hash(PersonName)
    RETURNS cstring
    AS '_OBJWD_/pname'
    LANGUAGE C IMMUTABLE STRICT;
@@ -92,25 +96,15 @@ CREATE OPERATOR > (
 CREATE FUNCTION pname_abs_cmp(PersonName, PersonName) RETURNS int4
    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
 
--- now we can make the operator class
-CREATE OPERATOR CLASS pname_abs_ops
-    DEFAULT FOR TYPE PersonName USING btree AS
-        OPERATOR        1       < ,
-        OPERATOR        2       <= ,
-        OPERATOR        3       = ,
-        OPERATOR        4       >= ,
-        OPERATOR        5       > ,
-        FUNCTION        1       pname_abs_cmp(PersonName, PersonName);
 
------------------------------
 -- Using the new type:
 --      user-defined types can be used like ordinary built-in types.
 -----------------------------
 
--- eg. we can use it in a table
-
-CREATE FUNCTION hash() RETURNS int4
-    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION hash(PersonName)
+    RETURNS int4
+    AS '_OBJWD_/pname'
+    LANGUAGE C IMMUTABLE STRICT;
 
 DROP TABLE if exists Students;
 create table Students (
@@ -128,5 +122,11 @@ insert into Students(zid,name,degree) values
 select *
 from   Students;
 
-create index on Students using hash (name);
+
+CREATE OPERATOR CLASS pname_abs_ops
+    DEFAULT FOR TYPE PersonName USING hash AS
+        OPERATOR        1       = ,
+        FUNCTION        1       hash(PersonName);
+
+create index on Students using hash(name pname_abs_ops);
 
