@@ -147,12 +147,6 @@ int main(){
 
     show("aa","bb");
 
-    char text[500];
-    fgets (text, sizeof(text), stdin);
-    Test * tst = malloc(sizeof(*tst) + sizeof(char)* strlen(text));
-    memcpy(tst->string, text, strlen(text));
-    printf("input was %s", tst->string);
-
     printf("done");
     return 0;
 }

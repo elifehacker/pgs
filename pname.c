@@ -132,13 +132,18 @@ pname_out(PG_FUNCTION_ARGS)
 
 #define Mag(c)	((c)->x*(c)->x + (c)->y*(c)->y)
 
-static char *
-get_family(PersonName * p)
+static char
+set_family(PersonName * a)
 {
-    char *family = palloc(sizeof(char)*(p->family_end+1));
-    memcpy(family, p->name, p->family_end);
-    family[p->family_end] = '\0';
-	return family;
+    char at = a->name[a->family_end];
+    a->name[a->family_end] = '\0';
+	return at;
+}
+
+static void
+reset_family(PersonName * a, char at)
+{
+    a->name[a->family_end] = at;
 }
 
 static char *
@@ -152,15 +157,17 @@ pname_abs_cmp_internal(PersonName * a, PersonName * b)
 {
     //char * af = get_family(a);
     //char * bf = get_family(b);
-    char at = a->name[a->family_end];
-    char bt = b->name[b->family_end];
-    a->name[a->family_end] = '\0';
-    b->name[b->family_end] = '\0';
-
+    char at = set_family(a);
+    char bt = set_family(b);
 	int result = strcmp(a->name, b->name);
 
-	a->name[a->family_end] = at;
-	b->name[b->family_end] = bt;
+	ereport(WARNING,
+            (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+                errmsg("2 input syntax for type %s: \"%s\"",
+                    a->name, b->name)));
+
+    reset_family(a, at);
+    reset_family(b, bt);
 
     if (result != 0)
         return result;
@@ -168,6 +175,28 @@ pname_abs_cmp_internal(PersonName * a, PersonName * b)
     return strcmp(get_given(a), get_given(b));
 }
 
+PG_FUNCTION_INFO_V1(family);
+
+Datum
+family(PG_FUNCTION_ARGS)
+{
+	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
+	char	 *result;
+    char tmp = set_family(pname);
+	result = psprintf("%s", pname->name);
+    reset_family(pname, tmp);
+	PG_RETURN_CSTRING(result);
+}
+
+PG_FUNCTION_INFO_V1(given);
+
+Datum
+given(PG_FUNCTION_ARGS)
+{
+	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
+	char *result = psprintf("%s", pname->name + pname->given_start);
+	PG_RETURN_CSTRING(result);
+}
 
 PG_FUNCTION_INFO_V1(pname_abs_lt);
 

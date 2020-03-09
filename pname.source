@@ -21,7 +21,12 @@ CREATE TYPE PersonName (
    storage = plain
 );
 
-CREATE FUNCTION pname_family(PersonName)
+CREATE FUNCTION family(PersonName)
+   RETURNS cstring
+   AS '_OBJWD_/pname'
+   LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION given(PersonName)
    RETURNS cstring
    AS '_OBJWD_/pname'
    LANGUAGE C IMMUTABLE STRICT;
