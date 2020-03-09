@@ -8,17 +8,27 @@
 ******************************************************************************/
 
 #include "postgres.h"
+#include "string.h"
 
 #include "fmgr.h"
 #include "libpq/pqformat.h"		/* needed for send/recv functions */
 
 PG_MODULE_MAGIC;
 
-typedef struct Pname
+
+typedef struct PName
 {
-	char *		family;
-	char *		given;
-} Pname;
+    int struct_size;
+	char name[];
+} PName;
+
+typedef struct PersonName
+{
+	PName *		family;
+	PName *		given;
+} PersonName;
+
+
 
 /*****************************************************************************
  * Input/Output functions
@@ -33,15 +43,40 @@ pname_abs_error_internal(char * str)
                     "pname", str)));
 }
 
+static struct PName *createPName(struct PName *s, char a[])
+{
+    // Allocating memory according to user provided
+    // array of characters
+
+    ereport(WARNING,
+    (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+        errmsg("- input syntax for type")));
+
+    s = malloc( sizeof(*s) + sizeof(char) * strlen(a));
+
+    ereport(WARNING,
+    (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+        errmsg("+ input syntax for type")));
+
+    strcpy(s->name, a);
+    // Assigning size according to size of stud_name
+    // which is a copy of user provided array a[].
+    s->struct_size =
+        (sizeof(*s) + sizeof(char) * strlen(s->name));
+
+    return s;
+}
+
+
 PG_FUNCTION_INFO_V1(pname_in);
 
 Datum
 pname_in(PG_FUNCTION_ARGS)
 {
 	char	*str = PG_GETARG_CSTRING(0);
-	char	*family = NULL,
+	PName	*family = NULL,
             *given = NULL;
-	Pname   *result;
+	PersonName   *result;
 
     char *ptr = strchr(str, ',');
     int family_size = ptr-str;
@@ -63,17 +98,23 @@ pname_in(PG_FUNCTION_ARGS)
     if(('a'<=str[0] && str[0]<= 'z') || ('a'<=ptr[1] && ptr[1]<= 'z'))
         pname_abs_error_internal(str);
 
-    family = (char *) malloc(sizeof(char)*(family_size+1));
-    given = (char *) malloc(sizeof(char)*(given_size+1));
 
-    memcpy(family, str, family_size);
-    memcpy(given, ptr+1, given_size);
-    *(family+family_size) = '\0';
-    *(given+given_size) = '\0';
+    ereport(WARNING,
+    (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+        errmsg("1 input syntax for type %d: \"%d\"",
+            family_size, given_size)));
 
-	result = (Pname *) palloc(sizeof(Pname));
-	result->family = family;
-	result->given = given;
+    family = createPName(family, str);
+    given = createPName(given, str);
+
+    ereport(WARNING,
+            (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+                errmsg("2 input syntax for type %s: \"%s\"",
+                    "pname", str)));
+
+	result = (PersonName *) palloc(sizeof(PersonName));
+	result->family= family;
+    result->given = given;
 
 	PG_RETURN_POINTER(result);
 }
@@ -83,10 +124,22 @@ PG_FUNCTION_INFO_V1(pname_out);
 Datum
 pname_out(PG_FUNCTION_ARGS)
 {
-	Pname    *pname = (Pname *) PG_GETARG_POINTER(0);
+	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
 	char	 *result;
 
-	result = psprintf("%s,%s", pname->family, pname->given);
+	result = psprintf("%s,%s", pname->family->name, pname->given->name);
+	PG_RETURN_CSTRING(result);
+}
+
+PG_FUNCTION_INFO_V1(pname_family);
+
+Datum
+pname_family(PG_FUNCTION_ARGS)
+{
+	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
+	char	 *result;
+
+	result = psprintf("%s", pname->family->name);
 	PG_RETURN_CSTRING(result);
 }
 
@@ -104,13 +157,13 @@ pname_out(PG_FUNCTION_ARGS)
 #define Mag(c)	((c)->x*(c)->x + (c)->y*(c)->y)
 
 static int
-pname_abs_cmp_internal(Pname * a, Pname * b)
+pname_abs_cmp_internal(PersonName * a, PersonName * b)
 {
-	int result = strcmp(a->family, b->family);
+	int result = strcmp(a->family->name, b->family->name);
     if (result != 0)
         return result;
 
-    return strcmp(a->given, b->given);
+    return strcmp(a->given->name, b->given->name);
 }
 
 
@@ -119,8 +172,8 @@ PG_FUNCTION_INFO_V1(pname_abs_lt);
 Datum
 pname_abs_lt(PG_FUNCTION_ARGS)
 {
-	Pname    *a = (Pname *) PG_GETARG_POINTER(0);
-	Pname    *b = (Pname *) PG_GETARG_POINTER(1);
+	PersonName    *a = (PersonName *) PG_GETARG_POINTER(0);
+	PersonName    *b = (PersonName *) PG_GETARG_POINTER(1);
 
 	PG_RETURN_BOOL(pname_abs_cmp_internal(a, b) < 0);
 }
@@ -130,8 +183,8 @@ PG_FUNCTION_INFO_V1(pname_abs_le);
 Datum
 pname_abs_le(PG_FUNCTION_ARGS)
 {
-	Pname    *a = (Pname *) PG_GETARG_POINTER(0);
-	Pname    *b = (Pname *) PG_GETARG_POINTER(1);
+	PersonName    *a = (PersonName *) PG_GETARG_POINTER(0);
+	PersonName    *b = (PersonName *) PG_GETARG_POINTER(1);
 
 	PG_RETURN_BOOL(pname_abs_cmp_internal(a, b) <= 0);
 }
@@ -141,8 +194,8 @@ PG_FUNCTION_INFO_V1(pname_abs_eq);
 Datum
 pname_abs_eq(PG_FUNCTION_ARGS)
 {
-	Pname    *a = (Pname *) PG_GETARG_POINTER(0);
-	Pname    *b = (Pname *) PG_GETARG_POINTER(1);
+	PersonName    *a = (PersonName *) PG_GETARG_POINTER(0);
+	PersonName    *b = (PersonName *) PG_GETARG_POINTER(1);
 
 	PG_RETURN_BOOL(pname_abs_cmp_internal(a, b) == 0);
 }
@@ -152,8 +205,8 @@ PG_FUNCTION_INFO_V1(pname_abs_ne);
 Datum
 pname_abs_ne(PG_FUNCTION_ARGS)
 {
-	Pname    *a = (Pname *) PG_GETARG_POINTER(0);
-	Pname    *b = (Pname *) PG_GETARG_POINTER(1);
+	PersonName    *a = (PersonName *) PG_GETARG_POINTER(0);
+	PersonName    *b = (PersonName *) PG_GETARG_POINTER(1);
 
 	PG_RETURN_BOOL(pname_abs_cmp_internal(a, b) != 0);
 }
@@ -163,8 +216,8 @@ PG_FUNCTION_INFO_V1(pname_abs_ge);
 Datum
 pname_abs_ge(PG_FUNCTION_ARGS)
 {
-	Pname    *a = (Pname *) PG_GETARG_POINTER(0);
-	Pname    *b = (Pname *) PG_GETARG_POINTER(1);
+	PersonName    *a = (PersonName *) PG_GETARG_POINTER(0);
+	PersonName    *b = (PersonName *) PG_GETARG_POINTER(1);
 
 	PG_RETURN_BOOL(pname_abs_cmp_internal(a, b) >= 0);
 }
@@ -174,8 +227,8 @@ PG_FUNCTION_INFO_V1(pname_abs_gt);
 Datum
 pname_abs_gt(PG_FUNCTION_ARGS)
 {
-	Pname    *a = (Pname *) PG_GETARG_POINTER(0);
-	Pname    *b = (Pname *) PG_GETARG_POINTER(1);
+	PersonName    *a = (PersonName *) PG_GETARG_POINTER(0);
+	PersonName    *b = (PersonName *) PG_GETARG_POINTER(1);
 
 	PG_RETURN_BOOL(pname_abs_cmp_internal(a, b) > 0);
 }
@@ -185,8 +238,8 @@ PG_FUNCTION_INFO_V1(pname_abs_cmp);
 Datum
 pname_abs_cmp(PG_FUNCTION_ARGS)
 {
-	Pname    *a = (Pname *) PG_GETARG_POINTER(0);
-	Pname    *b = (Pname *) PG_GETARG_POINTER(1);
+	PersonName    *a = (PersonName *) PG_GETARG_POINTER(0);
+	PersonName    *b = (PersonName *) PG_GETARG_POINTER(1);
 
 	PG_RETURN_INT32(pname_abs_cmp_internal(a, b));
 }

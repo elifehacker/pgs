@@ -13,8 +13,6 @@ CREATE FUNCTION pname_out(PersonName)
    AS '_OBJWD_/pname'
    LANGUAGE C IMMUTABLE STRICT;
 
--- now, we can create the type. The internallength specifies the size of the
--- memory block required to hold the type (we need two 8-byte doubles).
 CREATE TYPE PersonName (
    internallength = 16,
    input = pname_in,
@@ -22,6 +20,13 @@ CREATE TYPE PersonName (
    alignment = double
 );
 
+CREATE FUNCTION pname_family(PersonName)
+   RETURNS cstring
+   AS '_OBJWD_/pname'
+   LANGUAGE C IMMUTABLE STRICT;
+
+-- now, we can create the type. The internallength specifies the size of the
+-- memory block required to hold the type (we need two 8-byte doubles).
 
 -----------------------------
 -- Interfacing New Types with Indexes:
@@ -55,8 +60,17 @@ CREATE OPERATOR <= (
 CREATE OPERATOR = (
    leftarg = PersonName, rightarg = PersonName, procedure = pname_abs_eq,
    commutator = = , negator = <> ,
-   restrict = eqsel, join = eqjoinsel, HASHES
+   restrict = eqsel, join = eqjoinsel
 );
+
+CREATE OPERATOR === (
+    LEFTARG = PersonName,
+    RIGHTARG = PersonName,
+    FUNCTION = pname_abs_eq,
+    COMMUTATOR = ===
+);
+
+
 CREATE OPERATOR >= (
    leftarg = PersonName, rightarg = PersonName, procedure = pname_abs_ge,
    commutator = <= , negator = < ,
@@ -74,7 +88,7 @@ CREATE FUNCTION pname_abs_cmp(PersonName, PersonName) RETURNS int4
 
 -- now we can make the operator class
 CREATE OPERATOR CLASS pname_abs_ops
-    DEFAULT FOR TYPE PersonName USING hash AS
+    DEFAULT FOR TYPE PersonName USING btree AS
         OPERATOR        1       < ,
         OPERATOR        2       <= ,
         OPERATOR        3       = ,
@@ -104,15 +118,9 @@ insert into Students(zid,name,degree) values
 (9300035,'Shepherd, John Andrew', 'BSc(Computer Science)'),
 (5012345,'Smith, Stephen', 'BE(Hons)(Software Engineering)');
 
-create index on Students USING btree(name pname_abs_ops);
-
-select family(name), given(name), show(name)
-from   Students;
 
 select *
 from   Students;
 
-select name,count(*)
-from   Students
-group  by name;
+create index on Students using hash (name);
 
