@@ -63,8 +63,8 @@ pname_in(PG_FUNCTION_ARGS)
     if(('a'<=str[0] && str[0]<= 'z') || ('a'<=ptr[1] && ptr[1]<= 'z'))
         pname_abs_error_internal(str);
 
-    family = (char *) palloc(sizeof(char)*(family_size+1));
-    given = (char *) palloc(sizeof(char)*(given_size+1));
+    family = (char *) malloc(sizeof(char)*(family_size+1));
+    given = (char *) malloc(sizeof(char)*(given_size+1));
 
     memcpy(family, str, family_size);
     memcpy(given, ptr+1, given_size);
@@ -86,12 +86,7 @@ pname_out(PG_FUNCTION_ARGS)
 	Pname    *pname = (Pname *) PG_GETARG_POINTER(0);
 	char	 *result;
 
-		ereport(ERROR,
-            (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-                errmsg("inserted %s %s",
-                    pname->family, pname->given)));
-
-	result = psprintf("%s, %s", pname->family, pname->given);
+	result = psprintf("%s,%s", pname->family, pname->given);
 	PG_RETURN_CSTRING(result);
 }
 

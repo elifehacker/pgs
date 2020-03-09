@@ -48,15 +48,16 @@ Pname * test1(char* str){
     family = (char *) malloc(sizeof(char)*(family_size+1));
     given = (char *) malloc(sizeof(char)*(given_size+1));
 
-    memcpy(family, str, family_size);
-    memcpy(given, ptr+1, given_size);
-    *(family+family_size) = '\0';
-    *(given+given_size) = '\0';
+    strcpy(family, str);
+    family[family_size] = '\0';
+    strcpy(given, ptr+1);
 
     printf("x %s y %s\n", family, given);
     result = (Pname *) malloc(sizeof(Pname));
 	result->family = family;
 	result->given = given;
+	    printf("x %s y %s\n", result->family, result->given );
+
     return result;
 }
 

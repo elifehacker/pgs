@@ -55,7 +55,7 @@ CREATE OPERATOR <= (
 CREATE OPERATOR = (
    leftarg = PersonName, rightarg = PersonName, procedure = pname_abs_eq,
    commutator = = , negator = <> ,
-   restrict = eqsel, join = eqjoinsel
+   restrict = eqsel, join = eqjoinsel, HASHES
 );
 CREATE OPERATOR >= (
    leftarg = PersonName, rightarg = PersonName, procedure = pname_abs_ge,
@@ -74,7 +74,7 @@ CREATE FUNCTION pname_abs_cmp(PersonName, PersonName) RETURNS int4
 
 -- now we can make the operator class
 CREATE OPERATOR CLASS pname_abs_ops
-    DEFAULT FOR TYPE PersonName USING btree AS
+    DEFAULT FOR TYPE PersonName USING hash AS
         OPERATOR        1       < ,
         OPERATOR        2       <= ,
         OPERATOR        3       = ,
@@ -89,6 +89,9 @@ CREATE OPERATOR CLASS pname_abs_ops
 
 -- eg. we can use it in a table
 
+CREATE FUNCTION hash() RETURNS int4
+    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+
 DROP TABLE if exists Students;
 create table Students (
    zid       integer primary key,
@@ -97,19 +100,19 @@ create table Students (
 );
 
 insert into Students(zid,name,degree) values
+(9300036,'Shepherd,Test', 'BSc(Computer Science)'),
 (9300035,'Shepherd, John Andrew', 'BSc(Computer Science)'),
 (5012345,'Smith, Stephen', 'BE(Hons)(Software Engineering)');
 
-
+create index on Students USING btree(name pname_abs_ops);
 
 select family(name), given(name), show(name)
+from   Students;
+
+select *
 from   Students;
 
 select name,count(*)
 from   Students
 group  by name;
 
-
--- clean up the example
-DROP TABLE students;
-DROP TYPE pname CASCADE;
