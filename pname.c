@@ -74,6 +74,7 @@ pname_in(PG_FUNCTION_ARGS)
 	result = (Pname *) palloc(sizeof(Pname));
 	result->family = family;
 	result->given = given;
+
 	PG_RETURN_POINTER(result);
 }
 
@@ -84,6 +85,11 @@ pname_out(PG_FUNCTION_ARGS)
 {
 	Pname    *pname = (Pname *) PG_GETARG_POINTER(0);
 	char	 *result;
+
+		ereport(ERROR,
+            (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+                errmsg("inserted %s %s",
+                    pname->family, pname->given)));
 
 	result = psprintf("%s, %s", pname->family, pname->given);
 	PG_RETURN_CSTRING(result);
@@ -190,37 +196,3 @@ pname_abs_cmp(PG_FUNCTION_ARGS)
 	PG_RETURN_INT32(pname_abs_cmp_internal(a, b));
 }
 
-PG_FUNCTION_INFO_V1(pname_abs_family);
-
-Datum
-pname_abs_family(PG_FUNCTION_ARGS)
-{
-	Pname    *p = (Pname *) PG_GETARG_POINTER(0);
-
-	PG_RETURN_CSTRING(p->family);
-}
-
-PG_FUNCTION_INFO_V1(pname_abs_given);
-
-Datum
-pname_abs_given(PG_FUNCTION_ARGS)
-{
-	Pname    *p = (Pname *) PG_GETARG_POINTER(0);
-
-	PG_RETURN_CSTRING(p->given);
-}
-
-PG_FUNCTION_INFO_V1(pname_abs_show);
-
-Datum
-pname_abs_show(PG_FUNCTION_ARGS)
-{
-	Pname *p = (Pname *) PG_GETARG_POINTER(0);
-	char * a= p->given;
-    char * b= p->family;
-    char* c = (char *) palloc(sizeof(char)*(strlen(a)+strlen(b)+1));
-    memcpy(c, a, strlen(a));
-    memcpy(c+strlen(a), b, strlen(b));
-    *(c+strlen(a)+strlen(b)) = '\0';
-	PG_RETURN_CSTRING(c);
-}
