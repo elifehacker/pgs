@@ -16,7 +16,7 @@ CREATE FUNCTION pname_out(PersonName)
 CREATE TYPE PersonName (
    input = pname_in,
    output = pname_out,
-   internallength = 500,
+   internallength = VARIABLE,
    storage = plain
 );
 

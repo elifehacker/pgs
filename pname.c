@@ -21,7 +21,7 @@ typedef struct PersonName
     int struct_size;
     int family_end;
     int given_start;
-	char name[];
+	char name[FLEXIBLE_ARRAY_MEMBER];
 } PersonName;
 
 /*****************************************************************************
@@ -48,6 +48,11 @@ static struct PersonName *createPName(struct PersonName *s, char a[], int family
 
     s = palloc( sizeof(*s) + sizeof(char) * strlen(a));
 
+    ereport(WARNING,
+    (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+        errmsg("+ isizes %d %d ", sizeof(*s), VARHDRSZ)));
+
+
     strcpy(s->name, a);
     // Assigning size according to size of stud_name
     // which is a copy of user provided array a[].
@@ -56,9 +61,12 @@ static struct PersonName *createPName(struct PersonName *s, char a[], int family
     s->family_end = family_end;
     s->given_start = given_start;
 
+    SET_VARSIZE(s, sizeof(*s) + sizeof(char) * strlen(a));
+
 ereport(WARNING,
     (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-        errmsg("+ input syntax for type %s %d %d ", s->name, family_end, given_start )));
+        errmsg("+ input syntax for type %s %d %d %d",
+               s->name, family_end, given_start, VARSIZE(s))));
 
     return s;
 }
