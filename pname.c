@@ -80,6 +80,12 @@ is_lower_alphabet(char c)
 }
 
 static bool
+is_alphabet(char c)
+{
+     return is_upper_alphabet(c) || is_lower_alphabet(c);
+}
+
+static bool
 is_allowed_symbol(char c)
 {
      if( c == '-' || c == '\'')
@@ -132,7 +138,7 @@ pname_in(PG_FUNCTION_ARGS)
 
         prev = '\0';
         for(int i = 1; i < strlen(pch); i++){
-            if(!(is_lower_alphabet(pch[i]) || is_allowed_symbol(pch[i]))){
+            if(!(is_alphabet(pch[i]) || is_allowed_symbol(pch[i]))){
                 if(!(is_allowed_symbol(prev) && is_upper_alphabet(pch[i])))
                     pname_abs_error_internal(str);
             }
@@ -172,41 +178,36 @@ pname_out(PG_FUNCTION_ARGS)
 
 #define Mag(c)	((c)->x*(c)->x + (c)->y*(c)->y)
 
-static char
-set_family(PersonName * a)
+static char *
+get_family(PersonName * pname)
 {
-    char at = a->name[a->family_end];
-    a->name[a->family_end] = '\0';
-	return at;
-}
-
-static void
-reset_family(PersonName * a, char at)
-{
-    a->name[a->family_end] = at;
+	return psprintf("%.*s", pname->family_end, pname->name);
 }
 
 static char *
-get_given(PersonName * p)
+get_given(PersonName * pname)
 {
-	return p->name + p->given_start;
+    int size = strlen(pname->name) - pname->given_start;
+	return psprintf("%.*s", size, pname->name + pname->given_start);
+}
+
+static char *
+get_show(PersonName * p)
+{
+    char *given = get_given(p);
+    char *ptr = strchr(given, ' ');
+    int g_size = strlen(given);
+    if (ptr!=NULL)
+        g_size = ptr - given;
+	return psprintf("%.*s %s", g_size, given, get_family(p));
 }
 
 static int
 pname_abs_cmp_internal(PersonName * a, PersonName * b)
 {
-    //char * af = get_family(a);
-    //char * bf = get_family(b);
-    char at = set_family(a);
-    char bt = set_family(b);
-	int result = strcmp(a->name, b->name);
-
-    reset_family(a, at);
-    reset_family(b, bt);
-
+	int result = strcmp(get_family(a),get_family(b));
     if (result != 0)
         return result;
-
     return strcmp(get_given(a), get_given(b));
 }
 
@@ -233,11 +234,7 @@ Datum
 family(PG_FUNCTION_ARGS)
 {
 	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
-	char	 *result;
-    char tmp = set_family(pname);
-	result = psprintf("%s", pname->name);
-    reset_family(pname, tmp);
-	PG_RETURN_CSTRING(result);
+	PG_RETURN_CSTRING(get_family(pname));
 }
 
 PG_FUNCTION_INFO_V1(given);
@@ -246,8 +243,16 @@ Datum
 given(PG_FUNCTION_ARGS)
 {
 	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
-	char *result = psprintf("%s", pname->name + pname->given_start);
-	PG_RETURN_CSTRING(result);
+	PG_RETURN_CSTRING(get_given(pname));
+}
+
+PG_FUNCTION_INFO_V1(show);
+
+Datum
+show(PG_FUNCTION_ARGS)
+{
+	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
+	PG_RETURN_CSTRING(get_show(pname));
 }
 
 PG_FUNCTION_INFO_V1(pname_abs_lt);

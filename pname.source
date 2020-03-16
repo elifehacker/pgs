@@ -30,6 +30,11 @@ CREATE FUNCTION given(PersonName)
    AS '_OBJWD_/pname'
    LANGUAGE C IMMUTABLE STRICT;
 
+CREATE FUNCTION show(PersonName)
+   RETURNS cstring
+   AS '_OBJWD_/pname'
+   LANGUAGE C IMMUTABLE STRICT;
+
 -- now, we can create the type. The internallength specifies the size of the
 -- memory block required to hold the type (we need two 8-byte doubles).
 
@@ -46,6 +51,8 @@ CREATE FUNCTION pname_abs_lt(PersonName, PersonName) RETURNS bool
 CREATE FUNCTION pname_abs_le(PersonName, PersonName) RETURNS bool
    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION pname_abs_eq(PersonName, PersonName) RETURNS bool
+   AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION pname_abs_ne(PersonName, PersonName) RETURNS bool
    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION pname_abs_ge(PersonName, PersonName) RETURNS bool
    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
@@ -68,13 +75,11 @@ CREATE OPERATOR = (
    restrict = eqsel, join = eqjoinsel
 );
 
-CREATE OPERATOR === (
-    LEFTARG = PersonName,
-    RIGHTARG = PersonName,
-    FUNCTION = pname_abs_eq,
-    COMMUTATOR = ===
+CREATE OPERATOR <> (
+   leftarg = PersonName, rightarg = PersonName, procedure = pname_abs_ne,
+   commutator = <> , negator = = ,
+   restrict = neqsel, join = neqjoinsel
 );
-
 
 CREATE OPERATOR >= (
    leftarg = PersonName, rightarg = PersonName, procedure = pname_abs_ge,
