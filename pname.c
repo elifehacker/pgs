@@ -34,43 +34,58 @@ pname_abs_error_internal(char * str)
      ereport(ERROR,
             (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
                 errmsg("invalid input syntax for type %s: \"%s\"",
-                    "pname", str)));
+                    "PersonName", str)));
 }
 
-static struct PersonName *createPName(struct PersonName *s, char a[], int family_end, int given_start)
+static struct PersonName *createPName(struct PersonName *s, char a[], int family_end, int given_start, bool space)
 {
     // Allocating memory according to user provided
     // array of characters
+    int given_len = strlen(a) - given_start;
+    int new_size = family_end + 1 + given_len +1;
+    s = palloc( sizeof(*s) + sizeof(char) * new_size);
 
-    ereport(WARNING,
-    (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-        errmsg("- input syntax for type")));
-
-    s = palloc( sizeof(*s) + sizeof(char) * strlen(a));
-
-    ereport(WARNING,
-    (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-        errmsg("+ isizes %d %d ", sizeof(*s), VARHDRSZ)));
-
-
-    strcpy(s->name, a);
+    memcpy(s->name, a, family_end);
+    s->name[family_end]=',';
+    strcpy(s->name+family_end+1, a+given_start);
+    s->name[family_end+1+given_len]='\0';
     // Assigning size according to size of stud_name
     // which is a copy of user provided array a[].
     s->struct_size =
         (sizeof(*s) + sizeof(char) * strlen(s->name));
     s->family_end = family_end;
+    if (space)
+        given_start-=1;
     s->given_start = given_start;
 
-    SET_VARSIZE(s, sizeof(*s) + sizeof(char) * strlen(a));
-
-ereport(WARNING,
-    (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-        errmsg("+ input syntax for type %s %d %d %d",
-               s->name, family_end, given_start, VARSIZE(s))));
+    SET_VARSIZE(s, sizeof(*s) + sizeof(char) * new_size);
 
     return s;
 }
 
+static bool
+is_upper_alphabet(char c)
+{
+     if(c >= 'A' && c <= 'Z')
+        return true;
+     return false;
+}
+
+static bool
+is_lower_alphabet(char c)
+{
+     if(c >= 'a' && c <= 'z')
+        return true;
+     return false;
+}
+
+static bool
+is_allowed_symbol(char c)
+{
+     if( c == '-' || c == '\'')
+        return true;
+     return false;
+}
 
 PG_FUNCTION_INFO_V1(pname_in);
 
@@ -79,15 +94,18 @@ pname_in(PG_FUNCTION_ARGS)
 {
 	char	*str = PG_GETARG_CSTRING(0);
 	PersonName   *result;
-
+    bool space = false;
     char *ptr = strchr(str, ',');
     int family_size = ptr-str;
     int given_size = strlen(str) - family_size-1;
+    char * pch;
+    char* tempstr = palloc(strlen(str)+1);
+    char prev;
 
     if(given_size < 2 || family_size < 2)
         pname_abs_error_internal(str);
 
-    if(*(ptr-1) == ' ')
+    if(*(ptr-1) == ' ' || str[0] == ' ' || str[strlen(str)-1] == ' ')
         pname_abs_error_internal(str);
 
     if(strchr(ptr+1, ',')!= NULL)
@@ -96,22 +114,35 @@ pname_in(PG_FUNCTION_ARGS)
     if(*(ptr+1) == ' '){
         ptr+=1;
         given_size -=1;
+        space = true;
     }
-    if(('a'<=str[0] && str[0]<= 'z') || ('a'<=ptr[1] && ptr[1]<= 'z'))
+
+    if(*(ptr+1) == ' ')
         pname_abs_error_internal(str);
 
+    strcpy(tempstr, str);
+    pch = strtok (tempstr," ,");
+    while (pch != NULL)
+    {
+        if(strlen(pch)<2)
+            pname_abs_error_internal(str);
 
-    ereport(WARNING,
-    (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-        errmsg("1 input syntax for type %d: \"%d\"",
-            family_size, given_size)));
+        if(!is_upper_alphabet(pch[0]))
+            pname_abs_error_internal(str);
 
-	result = createPName(result, str, family_size, ptr - str + 1);
+        prev = '\0';
+        for(int i = 1; i < strlen(pch); i++){
+            if(!(is_lower_alphabet(pch[i]) || is_allowed_symbol(pch[i]))){
+                if(!(is_allowed_symbol(prev) && is_upper_alphabet(pch[i])))
+                    pname_abs_error_internal(str);
+            }
+            prev = pch[i];
+        }
 
-	    ereport(WARNING,
-            (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-                errmsg("2 input syntax for type %s: \"%s\"",
-                    "pname", str)));
+        pch = strtok (NULL, " ,");
+    }
+
+	result = createPName(result, str, family_size, ptr - str + 1, space);
 
 	PG_RETURN_POINTER(result);
 }
@@ -170,11 +201,6 @@ pname_abs_cmp_internal(PersonName * a, PersonName * b)
     char bt = set_family(b);
 	int result = strcmp(a->name, b->name);
 
-	ereport(WARNING,
-            (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-                errmsg("2 input syntax for type %s: \"%s\"",
-                    a->name, b->name)));
-
     reset_family(a, at);
     reset_family(b, bt);
 
@@ -188,11 +214,6 @@ static int
 pname_hash_internal(PersonName * p)
 {
     int h = hash_any((const unsigned char *)p->name, strlen(p->name));
-    ereport(WARNING,
-            (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-                errmsg("99 input syntax for type %d %s",
-                    h, p->name)));
-
 	return h;
 }
 
