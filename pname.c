@@ -12,15 +12,14 @@
 #include "utils/hashutils.h"
 
 #include "fmgr.h"
-#include "libpq/pqformat.h"		/* needed for send/recv functions */
+#include "libpq/pqformat.h"
+#include "utils/builtins.h"
 
 PG_MODULE_MAGIC;
 
 typedef struct PersonName
 {
     int struct_size;
-    int family_end;
-    int given_start;
 	char name[FLEXIBLE_ARRAY_MEMBER];
 } PersonName;
 
@@ -37,27 +36,19 @@ pname_abs_error_internal(char * str)
                     "PersonName", str)));
 }
 
-static struct PersonName *createPName(struct PersonName *s, char a[], int family_end, int given_start, bool space)
+static struct PersonName *createPName(struct PersonName *s, char a[], int family_end, int given_start)
 {
     // Allocating memory according to user provided
     // array of characters
-    int given_len = strlen(a) - given_start;
-    int new_size = family_end + 1 + given_len +1;
-    s = palloc( sizeof(*s) + sizeof(char) * new_size);
+    int     given_len = strlen(a) - given_start;
+    int     new_size = family_end + 1 + given_len +1;
 
+    s = palloc( sizeof(*s) + sizeof(char) * new_size);
     memcpy(s->name, a, family_end);
     s->name[family_end]=',';
     strcpy(s->name+family_end+1, a+given_start);
     s->name[family_end+1+given_len]='\0';
-    // Assigning size according to size of stud_name
-    // which is a copy of user provided array a[].
-    s->struct_size =
-        (sizeof(*s) + sizeof(char) * strlen(s->name));
-    s->family_end = family_end;
-    if (space)
-        given_start-=1;
-    s->given_start = given_start;
-
+    s->struct_size = (sizeof(*s) + sizeof(char) * strlen(s->name));
     SET_VARSIZE(s, sizeof(*s) + sizeof(char) * new_size);
 
     return s;
@@ -98,39 +89,37 @@ PG_FUNCTION_INFO_V1(pname_in);
 Datum
 pname_in(PG_FUNCTION_ARGS)
 {
-	char	*str = PG_GETARG_CSTRING(0);
-	PersonName   *result;
-    bool space = false;
-    char *ptr = strchr(str, ',');
-    int family_size = ptr-str;
-    int given_size = strlen(str) - family_size-1;
-    char * pch;
-    char* tempstr = palloc(strlen(str)+1);
-    char prev;
+	char       *str = PG_GETARG_CSTRING(0);
+	PersonName *result;
+    char       *ptr = strchr(str, ',');
+    int        family_size = ptr-str;
+    int        given_size = strlen(str) - family_size-1;
+    char       *pch;
+    char       *tempstr = palloc(strlen(str)+1);
+    char       prev;
 
     if(given_size < 2 || family_size < 2)
         pname_abs_error_internal(str);
 
-    if(*(ptr-1) == ' ' || str[0] == ' ' || str[strlen(str)-1] == ' ')
+    if(*(ptr - 1) == ' ' || str[0] == ' ' || str[strlen(str) - 1] == ' ')
         pname_abs_error_internal(str);
 
-    if(strchr(ptr+1, ',')!= NULL)
+    if(strchr(ptr + 1, ',')!= NULL)
         pname_abs_error_internal(str);
 
-    if(*(ptr+1) == ' '){
-        ptr+=1;
+    if(*(ptr + 1) == ' '){
+        ptr += 1;
         given_size -=1;
-        space = true;
     }
 
-    if(*(ptr+1) == ' ')
+    if(*(ptr + 1) == ' ')
         pname_abs_error_internal(str);
 
     strcpy(tempstr, str);
     pch = strtok (tempstr," ,");
     while (pch != NULL)
     {
-        if(strlen(pch)<2)
+        if(strlen(pch) < 2)
             pname_abs_error_internal(str);
 
         if(!is_upper_alphabet(pch[0]))
@@ -148,7 +137,7 @@ pname_in(PG_FUNCTION_ARGS)
         pch = strtok (NULL, " ,");
     }
 
-	result = createPName(result, str, family_size, ptr - str + 1, space);
+	result = createPName(result, str, family_size, ptr - str + 1);
 
 	PG_RETURN_POINTER(result);
 }
@@ -158,8 +147,8 @@ PG_FUNCTION_INFO_V1(pname_out);
 Datum
 pname_out(PG_FUNCTION_ARGS)
 {
-	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
-	char	 *result;
+	PersonName  *pname = (PersonName *) PG_GETARG_POINTER(0);
+	char        *result;
 
 	result = psprintf("%s", pname->name);
 	PG_RETURN_CSTRING(result);
@@ -181,22 +170,24 @@ pname_out(PG_FUNCTION_ARGS)
 static char *
 get_family(PersonName * pname)
 {
-	return psprintf("%.*s", pname->family_end, pname->name);
+    char    *ptr = strchr(pname->name, ',');
+	return psprintf("%.*s", ptr - pname->name, pname->name);
 }
 
 static char *
 get_given(PersonName * pname)
 {
-    int size = strlen(pname->name) - pname->given_start;
-	return psprintf("%.*s", size, pname->name + pname->given_start);
+    char    *ptr = strchr(pname->name, ',');
+    int     size = strlen(pname->name) - (ptr + 1 - pname->name);
+	return psprintf("%.*s", size, ptr + 1 );
 }
 
 static char *
 get_show(PersonName * p)
 {
-    char *given = get_given(p);
-    char *ptr = strchr(given, ' ');
-    int g_size = strlen(given);
+    char    *given = get_given(p);
+    char    *ptr = strchr(given, ' ');
+    int     g_size = strlen(given);
     if (ptr!=NULL)
         g_size = ptr - given;
 	return psprintf("%.*s %s", g_size, given, get_family(p));
@@ -218,7 +209,6 @@ pname_hash_internal(PersonName * p)
 	return h;
 }
 
-
 PG_FUNCTION_INFO_V1(hash1);
 
 Datum
@@ -234,7 +224,7 @@ Datum
 family(PG_FUNCTION_ARGS)
 {
 	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
-	PG_RETURN_CSTRING(get_family(pname));
+	PG_RETURN_TEXT_P(cstring_to_text(get_family(pname)));
 }
 
 PG_FUNCTION_INFO_V1(given);
@@ -243,7 +233,7 @@ Datum
 given(PG_FUNCTION_ARGS)
 {
 	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
-	PG_RETURN_CSTRING(get_given(pname));
+	PG_RETURN_TEXT_P(cstring_to_text(get_given(pname)));
 }
 
 PG_FUNCTION_INFO_V1(show);
@@ -252,7 +242,7 @@ Datum
 show(PG_FUNCTION_ARGS)
 {
 	PersonName    *pname = (PersonName *) PG_GETARG_POINTER(0);
-	PG_RETURN_CSTRING(get_show(pname));
+	PG_RETURN_TEXT_P(cstring_to_text(get_show(pname)));
 }
 
 PG_FUNCTION_INFO_V1(pname_abs_lt);

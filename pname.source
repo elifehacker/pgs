@@ -1,12 +1,7 @@
-Drop TYPE if exists PersonName cascade;
-
 CREATE FUNCTION pname_in(cstring)
    RETURNS PersonName
    AS '_OBJWD_/pname'
    LANGUAGE C IMMUTABLE STRICT;
-
--- the output function 'pname_out' takes the internal representation and
--- converts it into the textual representation.
 
 CREATE FUNCTION pname_out(PersonName)
    RETURNS cstring
@@ -21,31 +16,20 @@ CREATE TYPE PersonName (
 );
 
 CREATE FUNCTION family(PersonName)
-   RETURNS cstring
+   RETURNS text
    AS '_OBJWD_/pname'
    LANGUAGE C IMMUTABLE STRICT;
 
 CREATE FUNCTION given(PersonName)
-   RETURNS cstring
+   RETURNS text
    AS '_OBJWD_/pname'
    LANGUAGE C IMMUTABLE STRICT;
 
 CREATE FUNCTION show(PersonName)
-   RETURNS cstring
+   RETURNS text
    AS '_OBJWD_/pname'
    LANGUAGE C IMMUTABLE STRICT;
 
--- now, we can create the type. The internallength specifies the size of the
--- memory block required to hold the type (we need two 8-byte doubles).
-
------------------------------
--- Interfacing New Types with Indexes:
---	We cannot define a secondary index (eg. a B-tree) over the new type
---	yet. We need to create all the required operators and support
---      functions, then we can make the operator class.
------------------------------
-
--- first, define the required operators
 CREATE FUNCTION pname_abs_lt(PersonName, PersonName) RETURNS bool
    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION pname_abs_le(PersonName, PersonName) RETURNS bool
@@ -92,24 +76,24 @@ CREATE OPERATOR > (
    restrict = scalargtsel, join = scalargtjoinsel
 );
 
--- create the support function too
 CREATE FUNCTION pname_abs_cmp(PersonName, PersonName) RETURNS int4
    AS '_OBJWD_/pname' LANGUAGE C IMMUTABLE STRICT;
-
-
--- Using the new type:
---      user-defined types can be used like ordinary built-in types.
------------------------------
 
 CREATE FUNCTION hash1(PersonName)
     RETURNS int4
     AS '_OBJWD_/pname'
     LANGUAGE C IMMUTABLE STRICT;
 
-
 CREATE OPERATOR CLASS pname_abs_ops
     DEFAULT FOR TYPE PersonName USING hash AS
         OPERATOR        1       = ,
         FUNCTION        1       hash1(PersonName);
 
-
+CREATE OPERATOR CLASS pname_btree_ops
+    DEFAULT FOR TYPE PersonName USING btree AS
+        OPERATOR        1       < ,
+        OPERATOR        2       <= ,
+        OPERATOR        3       = ,
+        OPERATOR        4       >= ,
+        OPERATOR        5       > ,
+        FUNCTION        1       pname_abs_cmp(PersonName, PersonName);

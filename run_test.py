@@ -40,6 +40,8 @@ signal.signal(signal.SIGINT, signal.SIG_IGN)
 PGDATA = tempfile.mkdtemp()
 os.putenv("PGDATA", PGDATA)
 
+signal.signal(signal.SIGINT, lambda x, y: shutil.rmtree(PGDATA) and sys.exit(1))
+
 try:
     PGHOST = PGDATA
     os.putenv("PGHOST", PGHOST)
@@ -243,7 +245,7 @@ try:
                                                          os.path.join(TSTDIR, "tests", test_dir, "expected-{}-{}.log".format(data.split('/')[-1].split('.')[0], queries.split('/')[-1].split('.')[0]))), flush=True)
                         print("\trun: `diff {} {}`".format(os.path.join(TSTDIR, "results", test_dir.split("_")[1], "{}-{}.log".format(data.split('/')[-1].split('.')[0], queries.split('/')[-1].split('.')[0])),
                                                          os.path.join(TSTDIR, "tests", test_dir, "expected-{}-{}.log".format(data.split('/')[-1].split('.')[0], queries.split('/')[-1].split('.')[0]))), file=log, flush=True)
-                        txt = input("PAUSE")
+                        sys.exit(1)
                 else:
                     print("SKIP: {} -- {} -- {}: No expected output file".format(test_dir.split("_")[1], data.split('/')[-1].split('.')[0], queries.split('/')[-1].split('.')[0]), flush=True)
                     print("SKIP: {} -- {} -- {}: No expected output file".format(test_dir.split("_")[1], data.split('/')[-1].split('.')[0], queries.split('/')[-1].split('.')[0]), file=log, flush=True)
